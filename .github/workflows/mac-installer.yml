@@ -1,0 +1,54 @@
+name: macOS installers 1.0.30
+
+"on":
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mac-installer.yml
+      - packaging/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-installers-1.0.30
+  cancel-in-progress: false
+
+jobs:
+  mac:
+    if: github.repository == 'Efirios/kodaris-updates'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            chip: apple-silicon
+          - runner: macos-15-intel
+            chip: intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Package and check published release
+        env:
+          CHIP: ${{ matrix.chip }}
+        run: bash packaging/build-mac.sh "$CHIP"
+      - name: Add verified installers to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHIP: ${{ matrix.chip }}
+        run: |
+          set -euo pipefail
+          gh release upload v1.0.30 \
+            "dist/Kodaris-1.0.30-${CHIP}.dmg" \
+            "dist/Kodaris-1.0.30-${CHIP}.dmg.sha256" \
+            --repo "$GITHUB_REPOSITORY"
